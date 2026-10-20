@@ -1,0 +1,14 @@
+{
+  "source": "https://jsdh.de5.net/games/jujutsu-wheel-normal-v1",
+  "captured_date": "2026-10-21",
+  "capture_type": "Rendered DOM and inline script; not original repository",
+  "game_script_characters": 217671,
+  "game_script_sha256": "dee4dc347b18b866e5a380ed33cc4e99641182dbb239d10ee357c2aa0b70363c",
+  "changes": [
+    "Split HTML/CSS/JS",
+    "Remove hosting access and metrics scripts/styles",
+    "Remove browser annotation root",
+    "Vendor PeerJS 1.5.4"
+  ],
+  "gameplay_changes": false
+}

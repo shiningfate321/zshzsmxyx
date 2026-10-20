@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+  <meta name="author" content="芙丽莲大王">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>咒术回战 · 轮回转盘 — 穿越生存录</title>
+<link rel="stylesheet" href="./styles.css">
+<!-- PeerJS：跨网跨设备 WebRTC 信令（免费云服务器，自动交换offer/answer/ICE） -->
+<script data-cfasync="false" src="./vendor/peerjs.min.js" async=""></script>
+</head>
+<body>
+
+<!-- 全局悬浮控件：全屏 / 音效开关 -->
+<div class="global-ctl">
+  <button class="gctl-btn" id="btnSound" title="开关全部音效与语音">🔊 音效开</button>
+  <button class="gctl-btn" id="btnVoice" title="单独开关领域/极之番的语音念诵（不影响大字特效）">🗣 语音开</button>
+  <button class="gctl-btn" id="btnFullscreen" title="进入/退出全屏">⛶ 全屏</button>
+</div>
+
+<!-- ================= 标题界面 ================= -->
+<section id="titleScreen" class="screen">
+  <div>
+    <div class="title-main">咒术回战 · 轮回转盘</div>
+    <div class="title-sub">— 穿 越 生 存 录 —</div>
+  </div>
+  <div class="title-rule">
+    <b>▍玩法说明</b><br>
+    12连抽定出身，怀玉/宿傩等时间线开局。连续速度决定行动条快慢与撤退：≥1.3倍速必逃、<0.7倍速必败。死战用红色横条提示，撤退/败北进入撤退轮盘或生还轮盘；战胜后可杀死或放过对手，杀死己方阵营会被逐出并转为中立。部分角色可开启幻兽琥珀/亚光速形态，代价与收益都很极端。52术式含领域与极之番，最终新宿决战定结局。
+  </div>
+  <div class="title-btns">
+    <button class="btn" id="btnStart">开 始 穿 越</button>
+    <button class="btn" id="btnVersus" style="background:linear-gradient(135deg,#7a2a8a,#4a1a6a);border-color:#c060e0">本 地 对 战</button>
+    <button class="btn ghost" id="btnRestartTitle">重 置 一 切</button>
+  </div>
+</section>
+
+<!-- ================= 本地对战 · 大厅 ================= -->
+<section id="vsLobbyScreen" class="screen hidden">
+  <div class="vs-wrap">
+    <div class="vs-title">本地对战 · 大厅</div>
+    <div class="vs-sub">跨网跨设备 · 6位房间码即连</div>
+    <div class="vs-lobby-cards">
+      <div class="vs-lobby-card" id="vsOnlineCreate" style="border-color:#60e890">
+        <div class="vlc-icon">🌐</div>
+        <div class="vlc-title">创建房间（跨网）</div>
+        <div class="vlc-desc">生成6位房间码<br>任何网络设备都能加入</div>
+      </div>
+      <div class="vs-lobby-card" id="vsOnlineJoin" style="border-color:#60a8ff">
+        <div class="vlc-icon">🔑</div>
+        <div class="vlc-title">加入房间（跨网）</div>
+        <div class="vlc-desc">输入6位房间码<br>直接进入房间</div>
+      </div>
+      <div class="vs-lobby-card" id="vsLocalPlay">
+        <div class="vlc-icon">💻</div>
+        <div class="vlc-title">本机对战</div>
+        <div class="vlc-desc">同设备多标签页<br>零配置自动连接</div>
+      </div>
+    </div>
+    <!-- 跨网加入：输入房间码 -->
+    <div class="vs-join-panel hidden" id="vsOnlineJoinPanel">
+      <input class="vs-input" id="vsOnlineCode" placeholder="输入6位房间码…" maxlength="6" style="text-align:center;font-size:24px;letter-spacing:6px">
+      <button class="btn" id="vsDoOnlineJoin">进 入 房 间</button>
+    </div>
+    <!-- 局域网对战（备选） -->
+    <div style="margin-top:16px">
+      <button class="btn ghost" id="vsLanToggle">局域网直连模式（手动码交换）</button>
+    </div>
+    <div class="vs-join-panel hidden" id="vsLanPanel">
+      <div class="vs-conn-label">房主创建后在房内复制邀请码，客人粘贴后生成确认码发回房主</div>
+      <button class="btn" id="vsLanCreate">创建局域网房间</button>
+      <input class="vs-input" id="vsInviteCode" placeholder="粘贴房主邀请码…" maxlength="8000">
+      <button class="btn" id="vsDoJoin">加入局域网房间</button>
+    </div>
+    <button class="btn ghost" id="vsBackTitle">← 返回标题</button>
+  </div>
+</section>
+
+<!-- ================= 本地对战 · 房间 ================= -->
+<section id="vsRoomScreen" class="screen hidden">
+  <div class="vs-wrap">
+    <div class="vs-title">房间 · <span id="vsRoomName">未命名</span></div>
+    <div class="vs-room-info">
+      <span id="vsConnStatus">已连接</span>
+      <span id="vsPlayerCount">1/999 玩家</span>
+    </div>
+    <!-- 跨网对战：房主显示6位房间码 -->
+    <div class="vs-conn-box hidden" id="vsOnlineHostBox" style="text-align:center">
+      <div class="vs-conn-label">📡 跨网房间码（发给好友，任何网络都能加入）：</div>
+      <div class="vs-online-code" id="vsOnlineCodeDisplay">------</div>
+      <button class="btn ghost" id="vsCopyOnlineCode">复制房间码</button>
+      <div class="vs-conn-label" id="vsOnlineHostStatus" style="margin-top:8px">等待玩家加入…</div>
+    </div>
+    <!-- 跨网对战：客人显示连接状态 -->
+    <div class="vs-conn-box hidden" id="vsOnlineGuestBox" style="text-align:center">
+      <div class="vs-conn-label" id="vsOnlineGuestStatus">⏳ 正在连接房间…</div>
+    </div>
+    <!-- 局域网：房主邀请码 + 确认码输入 -->
+    <div class="vs-conn-box hidden" id="vsHostConnBox">
+      <div class="vs-conn-label">📋 房间码（发给要加入的玩家）：</div>
+      <textarea class="vs-codebox" id="vsRoomInviteCode" readonly=""></textarea>
+      <button class="btn ghost" id="vsCopyInvite">复制房间码</button>
+      <div class="vs-conn-label" style="margin-top:10px">🔑 玩家确认码（玩家加入后会发给你，粘贴此处自动连接）：</div>
+      <input class="vs-input" id="vsRoomAnswerInput" placeholder="粘贴玩家的确认码…" maxlength="8000">
+      <button class="btn" id="vsRoomAnswerBtn">连 接</button>
+    </div>
+    <!-- 局域网：客人连接状态 + 确认码 -->
+    <div class="vs-conn-box hidden" id="vsGuestConnBox">
+      <div class="vs-conn-label" id="vsGuestConnText">⏳ 确认码已复制到剪贴板，请发给房主，等待房主连接…</div>
+      <textarea class="vs-codebox" id="vsGuestAnswerCode" readonly=""></textarea>
+      <button class="btn ghost" id="vsCopyGuestAnswer">复制确认码</button>
+    </div>
+    <div class="vs-teams">
+      <div class="vs-team red">
+        <h4>🔴 红方（房主）</h4>
+        <div class="vs-team-list" id="vsRedList"></div>
+      </div>
+      <div class="vs-team blue">
+        <h4>🔵 蓝方</h4>
+        <div class="vs-team-list" id="vsBlueList"></div>
+      </div>
+    </div>
+    <div class="vs-self-panel" id="vsSelfPanel">
+      <div class="vs-self-title">你的角色</div>
+      <div class="vs-char-picker">
+        <div class="vs-char-tabs">
+          <button class="vs-tab on" data-vstab="npc">固有NPC</button>
+          <button class="vs-tab" data-vstab="custom">原创角色</button>
+        </div>
+        <div class="vs-npc-grid" id="vsNpcGrid"></div>
+        <div class="vs-custom-list hidden" id="vsCustomList">
+          <div class="vs-custom-empty">尚未创建原创角色</div>
+          <button class="btn" id="vsCreateChar">＋ 创建原创角色（14连抽）</button>
+        </div>
+      </div>
+      <div class="vs-team-pick hidden" id="vsTeamPick">
+        <span>选择加入队伍：</span>
+        <button class="btn small" id="vsJoinRed">加入红方</button>
+        <button class="btn small" id="vsJoinBlue">加入蓝方</button>
+      </div>
+      <div class="vs-ready-row">
+        <button class="btn" id="vsReady">准 备</button>
+        <button class="btn ghost hidden" id="vsStartBattle">开 始 对 战</button>
+      </div>
+    </div>
+    <button class="btn ghost" id="vsLeaveRoom">离开房间</button>
+  </div>
+</section>
+
+<!-- ================= 本地对战 · 创建角色（14连抽） ================= -->
+<section id="vsCreateScreen" class="screen hidden">
+  <div class="create-wrap">
+    <div class="wheel-stage">
+      <div class="wheel-step">原创角色设定 · 第 <b id="vsStepIdx">1</b> / 14 个</div>
+      <div class="wheel-title" id="vsWheelTitle">初始身份</div>
+      <div class="wheel-box">
+        <div class="wheel-pointer"></div>
+        <canvas id="vsWheelCanvas" width="500" height="500"></canvas>
+        <div class="wheel-hub" id="vsWheelHub">转动</div>
+      </div>
+      <div class="wheel-result" id="vsWheelResult">点击下方按钮，开始抽取……</div>
+      <div class="wheel-legend" id="vsWheelLegend"></div>
+      <div class="wheel-spd">转盘转速
+        <button class="vwspd" data-vwspd="1">1×</button>
+        <button class="vwspd on" data-vwspd="2">2×</button>
+        <button class="vwspd" data-vwspd="3">3×</button>
+        <button class="vwspd" data-vwspd="5">5×</button>
+        <button class="vwspd" data-vwspd="10">10×</button>
+      </div>
+      <div class="action-row" style="justify-content:center">
+        <button class="btn" id="vsSpin">抽 取</button>
+        <button class="btn" id="vsQuickCreate" style="border-color:rgba(116,224,143,.55);color:#74e08f;background:rgba(116,224,143,.08)">⚡ 一键创建（瞬间摇好）</button>
+        <button class="btn ghost hidden" id="vsNextWheel">前往下一个转盘 →</button>
+        <button class="btn hidden" id="vsConfirmChar">创 建 角 色</button>
+      </div>
+    </div>
+    <aside class="create-side">
+      <h3>已确定的设定</h3>
+      <div class="attr-list" id="vsAttrList">
+        <div class="attr-row"><span class="k">尚未抽取</span><span class="v" style="color:var(--txt3)">命运的轮盘尚未开始转动……</span></div>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<!-- ================= 角色创建（转盘）界面 ================= -->
+<section id="createScreen" class="screen hidden">
+  <div class="create-wrap">
+    <div class="wheel-stage">
+      <div class="wheel-step">基础设定转盘 · 第 <b id="stepIdx">1</b> / 12 个</div>
+      <div class="wheel-title" id="wheelTitle">初始身份</div>
+      <div class="wheel-box">
+        <div class="wheel-pointer"></div>
+        <canvas id="wheelCanvas" width="500" height="500"></canvas>
+        <div class="wheel-hub" id="wheelHub">转动</div>
+      </div>
+      <div class="wheel-result" id="wheelResult">点击下方按钮，开始抽取你的初始命运……</div>
+      <div class="wheel-legend" id="wheelLegend"></div>
+      <div class="wheel-spd">转盘转速
+        <button class="wspd" data-wspd="1">1×</button>
+        <button class="wspd on" data-wspd="2">2×</button>
+        <button class="wspd" data-wspd="3">3×</button>
+      </div>
+      <div class="action-row" style="justify-content:center">
+        <button class="btn" id="btnSpin">抽 取</button>
+        <button class="btn ghost hidden" id="btnNextWheel">前往下一个转盘 →</button>
+      </div>
+    </div>
+    <aside class="create-side">
+      <h3>已确定的穿越设定</h3>
+      <div class="attr-list" id="createAttrList">
+        <div class="attr-row"><span class="k">尚未抽取</span><span class="v" style="color:var(--txt3)">命运的轮盘尚未开始转动……</span></div>
+      </div>
+      <div class="progress-dots" id="progressDots"></div>
+    </aside>
+  </div>
+</section>
+
+<!-- ================= 游戏主界面 ================= -->
+<section id="mainScreen" class="screen hidden">
+  <div class="day-head">
+    <div class="day-big">第 <span id="dayNum">0</span> 天<small id="dayEra">宿傩受肉虎杖时期</small></div>
+    <div class="chapter-tag" id="chapterTag"></div>
+  </div>
+  <div class="main-grid">
+    <aside>
+      <div class="card" id="playerCard"></div>
+      <div class="card" style="margin-top:14px">
+        <h3>已悟技能 / 特殊状态</h3>
+        <div id="skillList" style="font-size:12.5px;line-height:2;color:var(--txt2)"></div>
+      </div>
+    </aside>
+    <div class="card">
+      <h3>轮回手记（游戏日志）</h3>
+      <div class="log-box" id="mainLog"></div>
+      <div class="next-event" id="nextEvent"></div>
+      <div class="action-row">
+        <button class="btn" id="btnActionWheel">转 动 行 动 轮 盘（推 进 1 天）</button>
+        <button class="btn ghost" id="btnShowAttr">查 看 详 细 属 性</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 通用模态容器 -->
+<div class="modal-mask hidden" id="modalMask">
+  <div class="modal" id="modalBox"></div>
+</div>
+<!-- 领域展开全屏特效层 -->
+<div id="domainOverlay"><div class="dom-cast" id="domCast">领 域 展 开</div><div class="dom-name" id="domName"></div><div class="dom-who" id="domWho"></div></div>
+<div id="fxOverlay"><div class="fx-who" id="fxWho"></div><div class="fx-main" id="fxMain"></div></div>
+<!-- 时间线跳转全屏大字 -->
+<div id="eraBanner" class="era-banner hidden"><div class="era-banner-text" id="eraBannerText"></div></div>
+
+<script src="./rules.js"></script>
+<script src="./game.js"></script>
+
+
+
+
+</body></html>
