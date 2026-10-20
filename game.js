@@ -1850,10 +1850,10 @@ function showWheelOverlay(opts){
     const overlay=document.createElement('div');
     overlay.className='wheel-overlay';
     overlay.innerHTML='<div class="wheel-dialog"><h2>'+title+'</h2>'+
-      '<div class="wheel-stage"><div class="wheel-disc" style="background:conic-gradient(#2dc653 0deg '+successDeg+'deg,#e01e37 '+successDeg+'deg 360deg)"></div>'+
-      '<div class="wheel-pointer-wrap" id="wheelPointer"><div class="wheel-pointer"></div></div><div class="wheel-hub"></div></div>'+
-      '<div class="wheel-legend"><span class="ok">'+successLabel+' '+Math.round(chance*100)+'%</span><span class="bad">'+failLabel+' '+Math.round((1-chance)*100)+'%</span></div>'+
-      '<p class="wheel-note">'+note+'</p><div class="center"><button class="btn" id="wheelSpin">转 动 轮 盘</button></div><div class="wheel-result" id="wheelResult"></div></div>';
+      '<div class="rw-stage"><div class="rw-disc" style="background:conic-gradient(#2dc653 0deg '+successDeg+'deg,#e01e37 '+successDeg+'deg 360deg)"></div>'+
+      '<div class="rw-pointer-wrap" id="wheelPointer"><div class="rw-pointer"></div></div><div class="rw-hub"></div></div>'+
+      '<div class="rw-legend"><span class="ok">'+successLabel+' '+Math.round(chance*100)+'%</span><span class="bad">'+failLabel+' '+Math.round((1-chance)*100)+'%</span></div>'+
+      '<p class="rw-note">'+note+'</p><div class="center"><button class="btn" id="wheelSpin">转 动 轮 盘</button></div><div class="rw-result" id="wheelResult"></div></div>';
     document.body.appendChild(overlay);
     const pointer=overlay.querySelector('#wheelPointer');
     const spinBtn=overlay.querySelector('#wheelSpin');
@@ -1867,7 +1867,7 @@ function showWheelOverlay(opts){
       else{const start=Math.min(359,arc+8);angle=start+Math.random()*Math.max(1,351-start);}
       pointer.style.transform='rotate('+(angle+1440)+'deg)';
       setTimeout(()=>{
-        resultEl.innerHTML='<div class="wheel-outcome '+(success?'ok':'bad')+'">'+(success?successLabel:failLabel)+'</div>';
+        resultEl.innerHTML='<div class="rw-outcome '+(success?'ok':'bad')+'">'+(success?successLabel:failLabel)+'</div>';
         const btn=document.createElement('button');btn.className='btn';btn.textContent='继 续';
         btn.onclick=()=>{if(done)return;done=true;overlay.remove();resolve(success);};
         resultEl.appendChild(btn);SFX.click();
