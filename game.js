@@ -596,6 +596,7 @@ class BattleEngine{
   /** cfg:{title, player(P), enemies:[{name,li,type}], allies:[{name,li,type}]} */
   constructor(cfg){
     this.cfg=cfg;this.ended=false;this.result=null;this.events=[];this.lastActor=null;this.awaitingPlayer=false;
+    this.playerKiller=null;this.lastPlayerAttacker=null;
     this.actionsTotal=0;this.units=[];this.killedPool=[];this._downNotified=false; // killedPool: 本场被击败敌人的面板快照（供咒灵操术/降灵召唤）
     this.player=this.makePlayerUnit(cfg.player);
     this.units.push(this.player);
@@ -1349,6 +1350,7 @@ class BattleEngine{
       }
       ev.push({type:'flash',text:`★ 黑 闪 ★ 空间被一击扭曲！本次伤害×10${att.isPlayer?'，且你全属性永久+10%':''}！`});
     }
+    if(tar.isPlayer&&att&&!att.isPlayer)this.lastPlayerAttacker=att;
     tar.hp-=dmg;
     ev.push({type:flash?'flash':'hit',from:att.name,to:tar.name,text:`${label} → 命中 ${tar.name}，造成 ${dmg} 点伤害。`,dmg});
     // 奇迹：死亡时耗30%咒力复活并回满
@@ -1362,7 +1364,12 @@ class BattleEngine{
     return dmg;
   }
   kill(u,ev,killer){
-    if(!u.alive)return;u.hp=0;u.alive=false;
+    if(!u.alive)return;
+    if(u.isPlayer){
+      const k=(killer&&!killer.isPlayer)?killer:(this.lastPlayerAttacker&&!this.lastPlayerAttacker.isPlayer?this.lastPlayerAttacker:null);
+      if(k)this.playerKiller=k;
+    }
+    u.hp=0;u.alive=false;
     ev.push({type:'die',name:u.name,text:`${u.side==='enemy'?'◆':'◇'} ${u.name} 被击溃。`});
     const snap={name:u.name,maxHp:u.maxHp,maxCp:u.maxCp,melee:u.melee.slice(),eff:u.eff.slice(),li:u.li};
     // 本场池（供 NPC 羂索等召唤）
@@ -4247,7 +4254,7 @@ const CampaignUI={
       '<li><b>处置</b>：战胜时生命高于30%可选择杀死/放过；不高于30%自动击杀并照常结算好感。只有具名剧情角色触发处置与好感，野生咒灵、杂兵、式神不计入。</li>'+
       '<li><b>中立</b>：杀死一方角色 → 另一方好感 +10、被杀方 −30；放过 → 败方阵营 +10，并计入该阵营的特殊生还记录。</li>'+
       '<li><b>有阵营</b>：杀死敌对阵营 → 己方 +10、敌方 −10；杀死己方阵营 → 己方 −120，敌方 +20，并<b>立即逐出己方阵营、转为中立</b>；此后该阵营好感增加减半、减少加倍。诅咒阵营杀死非特级咒灵不降己方好感。</li>'+
-      '<li><b>生还轮盘</b>：特殊生还 = 曾放过该阵营且从未击杀该阵营任何人（高专70%、诅咒30%）；普通生还 = 该阵营好感 >70（40%＋超出70的点数×1%，上限70%）。每个阵营取较高的一项；混合敌队取最不愿放过的阵营；真人一票否决。进入哪种轮盘由较高概率决定，概率为0时不进入轮盘。</li>'+
+      '<li><b>生还轮盘</b>：由击败你的角色决定阵营。特殊生还 = 曾放过该阵营且从未击杀该阵营任何人（高专70%、诅咒30%）；普通生还 = 该阵营好感 >70（40%＋超出70的点数×1%，上限70%）。该阵营取特殊/普通较高的一项；若击败者是真人则0%。混合队伍中其他阵营不参与判定。概率为0时不进入轮盘。</li>'+
       '<li><b>撤退</b>：死战时进入撤退轮盘：成功进入下一轮且无奖励；失败继续当前战斗并消耗本次行动。非死战仍直接判定。速度 ≥ 最快敌人1.3倍 → 必成；<0.7倍 → 必败；中间按 0.5×（己方血量% ÷ 最快敌人血量%），上限75%、下限5%。</li>'+
       '<li><b>加入/倒戈</b>：好感 ≥50 可加入；中立加入时另一阵营 −30；已有阵营者倒戈时原阵营 −100。</li>'+
       '<li><b>速度</b>：体质基础（档位+档内进度）×咒效权重（0.88+0.02×档位进度）×术式最高倍率。投射×1.45且有效速度保底20（减速前），无下限×1.1，神速/琥珀×1.3/1.8，质量杀意/亚光速×1.25/2.5。多个术式取最高。</li>'+
@@ -4354,24 +4361,26 @@ const CampaignUI={
     if(cfg.deathmatch){
       const survivors=eng.units.filter(u=>u.side==='enemy'&&u.alive&&!u.summonTag).map(u=>
         Object.assign({},u,cfg.enemies.find(e=>e.name===u.name)||{}));
-      const info=Rules.survivalInfo(P,survivors.length?survivors:cfg.enemies);
+      const killer=eng.playerKiller||eng.lastPlayerAttacker||null;
+      const info=Rules.survivalInfo(P,survivors.length?survivors:cfg.enemies,killer);
+      const by=info.name?'你被【'+info.name+'】击败。':'';
       if(eng.player&&eng.player.amberUsed){
         Game.addLog('lred','【幻兽琥珀】反噬已注定，生还轮盘不会开启。');
       }else if(info.chance>0){
         const typeLabel=info.type==='special'?'特殊生还':'普通生还';
-        const note=info.type==='special'
+        const note=by+(info.type==='special'
           ? '你曾放过'+Rules.labels[info.camp]+'角色，且从未击杀该阵营任何人。'
-          : '该阵营好感：'+P.reputation[info.camp]+'。';
+          : '该阵营好感：'+P.reputation[info.camp]+'。');
         const survived=Game.showWheel?await Game.showWheel({title:'死战 · '+typeLabel+'轮盘',chance:info.chance,
           successLabel:'生 还',failLabel:'死 亡',note}):Math.random()<info.chance;
         if(survived){
-          const text='你在死战中败北，但在'+typeLabel+'轮盘上生还（'+Math.round(info.chance*100)+'%）。没有战胜奖励。';
+          const text=by+'你在死战中败北，但在'+typeLabel+'轮盘上生还（'+Math.round(info.chance*100)+'%）。没有战胜奖励。';
           P.notes.push(text);Game.addLog('lgold',text);
           Game.afterBattleRecover();return settle('spared');
         }
-        Game.addLog('lred','死战'+typeLabel+'轮盘失败（'+Math.round(info.chance*100)+'%）。');
+        Game.addLog('lred','死战'+typeLabel+'轮盘失败（'+Math.round(info.chance*100)+'%'+(info.name?'；击败者：'+info.name:'')+'）。');
       }else{
-        Game.addLog('lred',info.type==='mahito'?'死战败北：真人绝不会放过你。':'死战败北：没有可用的生还概率。');
+        Game.addLog('lred',info.type==='mahito'?'死战败北：真人绝不会放过你。':'死战败北：没有可用的生还概率'+(info.name?'（击败者：'+info.name+'）':'')+'。');
       }
     }
     Game.afterBattleRecover();return settle('lose');

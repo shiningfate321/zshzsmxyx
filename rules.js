@@ -146,28 +146,43 @@
     return worst||{chance:0,source:'none',camp:null,name:null};
   }
   function mercyChance(P,enemies,ticket={}){return mercyInfo(P,enemies,ticket).chance;}
+  function campSurvival(P,c,name){
+    const spared=(P.sparedCamps&&P.sparedCamps[c])||0;
+    const killed=(P.killedCamps&&P.killedCamps[c])||0;
+    const special=(spared>0&&killed===0)?(c==='hero'?0.7:0.3):0;
+    const rep=P.reputation[c];
+    const normal=rep>70?Math.min(0.7,0.4+(rep-70)*0.01):0;
+    const chance=Math.max(special,normal);
+    const type=chance<=0?'none':(special>=normal?'special':'normal');
+    return {chance,type,camp:c,name:name||null,special,normal};
+  }
   /**
-   * 死战生还轮盘：特殊生还（曾放过该阵营且从未击杀该阵营）vs 普通生还（好感>70）。
-   * 每个阵营取较高的一项；混合敌队取最不愿放过的阵营；真人一票否决。
+   * 死战生还轮盘：由“击败玩家的角色”决定阵营。
+   * 该角色所在阵营取特殊生还/普通生还中较高的一项；若击败者是真人则0。
+   * 只有没有明确击败者（自伤/未知）时，才回退到全体存活敌人取最低。
    */
-  function survivalInfo(P,enemies){
+  function survivalInfo(P,enemies,killer){
     init(P);
+    if(killer&&!killer.isPlayer){
+      let focus=killer;
+      if(killer.ownerName&&Array.isArray(enemies)){
+        const owner=enemies.find(e=>e.name===killer.ownerName);
+        if(owner)focus=owner;
+      }
+      const kName=killer.name||(focus&&focus.name)||null;
+      if(/真人/.test(kName||'')||(focus&&/真人/.test(focus.name||'')))
+        return {chance:0,type:'mahito',camp:'villain',name:kName||'真人',special:0,normal:0};
+      const camp=focus?campOf(focus):null;
+      if(camp)return campSurvival(P,camp,kName);
+    }
     if(!enemies||!enemies.length)return {chance:0,type:'none',camp:null,name:null,special:0,normal:0};
     if(enemies.some(e=>/真人/.test(e.name||'')))return {chance:0,type:'mahito',camp:'villain',name:'真人',special:0,normal:0};
     const present=[...new Set(enemies.map(campOf).filter(Boolean))];
     if(!present.length)return {chance:0,type:'none',camp:null,name:null,special:0,normal:0};
     let worst=null;
     for(const c of present){
-      const spared=(P.sparedCamps&&P.sparedCamps[c])||0;
-      const killed=(P.killedCamps&&P.killedCamps[c])||0;
-      const special=(spared>0&&killed===0)?(c==='hero'?0.7:0.3):0;
-      const rep=P.reputation[c];
-      const normal=rep>70?Math.min(0.7,0.4+(rep-70)*0.01):0;
-      const chance=Math.max(special,normal);
-      const type=chance<=0?'none':(special>=normal?'special':'normal');
-      const name=(enemies.find(e=>campOf(e)===c)||{}).name||null;
-      const info={chance,type,camp:c,name,special,normal};
-      if(!worst||chance<worst.chance)worst=info;
+      const info=campSurvival(P,c,(enemies.find(e=>campOf(e)===c)||{}).name||null);
+      if(!worst||info.chance<worst.chance)worst=info;
     }
     return worst||{chance:0,type:'none',camp:null,name:null,special:0,normal:0};
   }
